@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import difflib  # For similarity calculation
+import pickle   # >>> CHANGES FOR RANDOM SAMPLES: Import pickle to load saved vocabulary
 
 from dataset import VQADataset
 from model import VQAModel
@@ -23,6 +24,13 @@ config = Config()
 vocab_size = len(eval_dataset.word2idx)
 if eval_dataset.answer2idx is not None:
     config.num_classes = len(eval_dataset.answer2idx)
+
+#  CHANGES FOR RANDOM SAMPLES: Load saved vocabulary mapping and assign it to eval_dataset
+with open("vocab.pkl", "rb") as f:
+    saved_word2idx = pickle.load(f)
+print(f"[DEBUG] Loaded vocabulary with size: {len(saved_word2idx)}")
+eval_dataset.word2idx = saved_word2idx
+vocab_size = len(saved_word2idx)
 
 # --- Initialize and Load the Model ---
 model = VQAModel(vocab_size, config).to(config.device)

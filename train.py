@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-
+import pickle
 from dataset import VQADataset
 from model import VQAModel
 from config import Config
@@ -43,7 +43,13 @@ class Trainer:
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.5)
-    
+
+        # changes for random samples:
+        # Save the vocabulary mapping so that evaluation uses the same vocabulary.
+        with open("vocab.pkl", "wb") as f:
+            pickle.dump(self.train_dataset.word2idx, f)
+        print("[DEBUG] Vocabulary saved to vocab.pkl")
+
     def train(self):
         best_val_loss = float('inf')
         for epoch in range(self.config.num_epochs):
