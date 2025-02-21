@@ -1,9 +1,10 @@
-# trainer.py
+# train.py snippet
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import pickle
+
 from dataset import VQADataset
 from model import VQAModel
 from config import Config
@@ -13,7 +14,7 @@ class Trainer:
     def __init__(self, train_csv, img_dir, answer_space_file=None, train_img_list=None, val_csv=None, test_img_list=None):
         self.config = Config()
         
-        # Create the training dataset using the training CSV and the training image list.
+        # Create the training dataset
         self.train_dataset = VQADataset(train_csv, img_dir, answer_space_file, train_img_list)
         self.train_dataloader = DataLoader(
             self.train_dataset, 
@@ -22,7 +23,7 @@ class Trainer:
             collate_fn=vqa_collate_fn
         )
         
-        # Create the validation dataset using the validation CSV and the test image list.
+        # Create the validation dataset if provided
         self.val_dataloader = None
         if val_csv is not None:
             self.val_dataset = VQADataset(val_csv, img_dir, answer_space_file, test_img_list)
@@ -33,23 +34,21 @@ class Trainer:
                 collate_fn=vqa_collate_fn
             )
         
-        # Set vocabulary size and update number of answer classes (if applicable)
         self.vocab_size = len(self.train_dataset.word2idx)
         if self.train_dataset.answer2idx is not None:
             self.config.num_classes = len(self.train_dataset.answer2idx)
         
-        # Create the model.
+        # Initialize model, loss, optimizer, and scheduler.
         self.model = VQAModel(self.vocab_size, self.config).to(self.config.device)
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.config.learning_rate)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.5)
-
-        # changes for random samples:
-        # Save the vocabulary mapping so that evaluation uses the same vocabulary.
+        
+        # Save vocabulary mapping for consistency in evaluation.
         with open("vocab.pkl", "wb") as f:
             pickle.dump(self.train_dataset.word2idx, f)
         print("[DEBUG] Vocabulary saved to vocab.pkl")
-
+    
     def train(self):
         best_val_loss = float('inf')
         for epoch in range(self.config.num_epochs):
