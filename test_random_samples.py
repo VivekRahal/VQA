@@ -1,4 +1,5 @@
 # test_random_samples.py
+import os  # >>> EXTENSION CHANGE: Import os for file path operations
 import random
 import torch
 import torchvision.transforms as transforms
@@ -13,10 +14,10 @@ from model import VQAModel
 from config import Config
 
 # --- Configuration and Paths ---
-EVAL_CSV = "data/data_eval.csv"     # Evaluation CSV file
-IMG_DIR = "data/images"              # Directory with images
+EVAL_CSV = "data/data_eval.csv"             # Evaluation CSV file
+IMG_DIR = "data/images"                      # Directory with images
 ANSWER_SPACE_FILE = "data/answer_space.txt"  # Answer mapping file (if used)
-IMG_LIST_FILE = None  # Use None or a test image list file if available
+IMG_LIST_FILE = None                         # Use None or a test image list file if available
 
 # --- Load the Evaluation Dataset ---
 eval_dataset = VQADataset(EVAL_CSV, IMG_DIR, ANSWER_SPACE_FILE, IMG_LIST_FILE)
@@ -25,23 +26,25 @@ vocab_size = len(eval_dataset.word2idx)
 if eval_dataset.answer2idx is not None:
     config.num_classes = len(eval_dataset.answer2idx)
 
-#  CHANGES FOR RANDOM SAMPLES: Load saved vocabulary mapping and assign it to eval_dataset
+# >>> CHANGES FOR RANDOM SAMPLES: Load saved vocabulary mapping and assign it to eval_dataset
 with open("vocab.pkl", "rb") as f:
     saved_word2idx = pickle.load(f)
 print(f"[DEBUG] Loaded vocabulary with size: {len(saved_word2idx)}")
 eval_dataset.word2idx = saved_word2idx
 vocab_size = len(saved_word2idx)
+# <<< CHANGES FOR RANDOM SAMPLES
 
 # --- Initialize and Load the Model ---
 model = VQAModel(vocab_size, config).to(config.device)
 model.load_state_dict(torch.load("best_model.pth", map_location=config.device))
 model.eval()
 
-# --- Define Transformation (should match your training transform) ---
-transform = transforms.Compose([
+# >>> EXTENSION CHANGE: Define a deterministic evaluation transform (without augmentation)
+eval_transform = transforms.Compose([
     transforms.Resize((64, 64)),
     transforms.ToTensor()
 ])
+# <<< EXTENSION CHANGE
 
 # --- Helper Function: Tokenize a question ---
 def tokenize_question(question: str, word2idx: dict, max_len: int = 20):
@@ -81,11 +84,22 @@ for idx in indices:
     # Get original question text from the DataFrame
     question_text = eval_dataset.data.iloc[idx]["question"]
     
-    # Convert image tensor back to PIL image for display:
+    # >>> EXTENSION CHANGE: Resolve file path issues when reloading image for display.
+    img_path = os.path.join(IMG_DIR, eval_dataset.data.iloc[idx]["image_id"])
+    if not os.path.exists(img_path):
+        for ext in [".jpg", ".png"]:
+            candidate_path = img_path + ext
+            if os.path.exists(candidate_path):
+                img_path = candidate_path
+                break
+    # Now use eval_transform to load image
+    img_tensor = eval_transform(Image.open(img_path).convert("RGB"))
+    # <<< EXTENSION CHANGE
+    
+    # Convert tensor back to PIL image for display
     pil_image = transforms.ToPILImage()(img_tensor.cpu())
     
     # Prepare the question tensor for the model:
-    # We use the original question text to tokenize using our helper
     tokens = tokenize_question(question_text, eval_dataset.word2idx, max_len=20)
     question_tensor = torch.tensor([tokens]).to(config.device)
     
