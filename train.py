@@ -10,7 +10,7 @@ from dataset import VQADataset
 from model import VQAModel
 from config import Config
 from utils.helper import vqa_collate_fn
-#from utils.training_stats import print_training_stats  # NEW: Import training stats helper
+from utils.training_stats import print_training_stats  # NEW: Import training stats helper
 
 class Trainer:
     def __init__(self, train_csv, img_dir, answer_space_file=None, train_img_list=None, val_csv=None, test_img_list=None):
