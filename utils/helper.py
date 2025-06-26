@@ -44,3 +44,39 @@ def build_answer_mapping(csv_file):
     df = pd.read_csv(csv_file)
     answers = sorted(df['answer'].unique())
     return {ans: idx for idx, ans in enumerate(answers)}
+
+def preprocess_question(question, vocab=None, tokenizer=None, max_length=32):
+    """
+    Preprocess a question string for the VQA model.
+    If a Hugging Face tokenizer is provided (for BERT/ViT), use it.
+    Otherwise, use vocab and whitespace tokenization.
+    Args:
+        question (str): The input question.
+        vocab (dict, optional): Vocabulary mapping word to index (for non-BERT models).
+        tokenizer (transformers.PreTrainedTokenizer, optional): Hugging Face tokenizer for BERT/ViT.
+        max_length (int): Maximum sequence length (for padding/truncation).
+    Returns:
+        torch.Tensor: Token indices (1D tensor)
+    """
+    if tokenizer is not None:
+        # Use Hugging Face tokenizer (for BERT/ViT)
+        encoding = tokenizer(
+            question,
+            padding='max_length',
+            truncation=True,
+            max_length=max_length,
+            return_tensors='pt'
+        )
+        return encoding['input_ids'].squeeze(0)  # shape: (max_length,)
+    elif vocab is not None:
+        # Simple whitespace tokenization and vocab lookup
+        tokens = question.lower().strip().split()
+        indices = [vocab.get(token, vocab.get('<UNK>', 1)) for token in tokens]
+        # Pad or truncate
+        if len(indices) < max_length:
+            indices += [vocab.get('<PAD>', 0)] * (max_length - len(indices))
+        else:
+            indices = indices[:max_length]
+        return torch.tensor(indices, dtype=torch.long)
+    else:
+        raise ValueError('Either vocab or tokenizer must be provided to preprocess_question.')
