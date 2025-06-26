@@ -1,159 +1,146 @@
 # encoders/vit_encoder.py
+"""
+Vision Transformer (ViT) encoder module for VQA system.
+
+This module provides a ViT encoder that uses pretrained Vision Transformer models from Hugging Face.
+It wraps the transformers.ViTModel for easy integration into the VQA system.
+"""
+
+from typing import Optional
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from transformers import ViTModel, ViTImageProcessor
 from .base_encoder import BaseEncoder
 
-class PatchEmbedding(nn.Module):
-    """Patch embedding layer for Vision Transformer."""
-    
-    def __init__(self, img_size: int = 224, patch_size: int = 16, in_channels: int = 3, embed_dim: int = 768):
-        super().__init__()
-        self.img_size = img_size
-        self.patch_size = patch_size
-        self.n_patches = (img_size // patch_size) ** 2
-        
-        self.proj = nn.Conv2d(in_channels, embed_dim, kernel_size=patch_size, stride=patch_size)
-    
-    def forward(self, x):
-        """
-        Args:
-            x: Input tensor of shape (batch_size, channels, height, width)
-        Returns:
-            Patches of shape (batch_size, n_patches, embed_dim)
-        """
-        x = self.proj(x)  # (batch_size, embed_dim, H//patch_size, W//patch_size)
-        x = x.flatten(2)  # (batch_size, embed_dim, n_patches)
-        x = x.transpose(1, 2)  # (batch_size, n_patches, embed_dim)
-        return x
-
-class MultiHeadAttention(nn.Module):
-    """Multi-head self-attention mechanism."""
-    
-    def __init__(self, embed_dim: int, num_heads: int, dropout: float = 0.1):
-        super().__init__()
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.head_dim = embed_dim // num_heads
-        assert self.head_dim * num_heads == embed_dim, "embed_dim must be divisible by num_heads"
-        
-        self.qkv = nn.Linear(embed_dim, embed_dim * 3)
-        self.attn_drop = nn.Dropout(dropout)
-        self.proj = nn.Linear(embed_dim, embed_dim)
-        self.proj_drop = nn.Dropout(dropout)
-    
-    def forward(self, x):
-        batch_size, seq_len, embed_dim = x.shape
-        
-        qkv = self.qkv(x).reshape(batch_size, seq_len, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
-        q, k, v = qkv[0], qkv[1], qkv[2]
-        
-        attn = (q @ k.transpose(-2, -1)) * (self.head_dim ** -0.5)
-        attn = F.softmax(attn, dim=-1)
-        attn = self.attn_drop(attn)
-        
-        x = (attn @ v).transpose(1, 2).reshape(batch_size, seq_len, embed_dim)
-        x = self.proj(x)
-        x = self.proj_drop(x)
-        return x
-
-class TransformerBlock(nn.Module):
-    """Transformer block with self-attention and feed-forward network."""
-    
-    def __init__(self, embed_dim: int, num_heads: int, mlp_ratio: float = 4.0, dropout: float = 0.1):
-        super().__init__()
-        self.norm1 = nn.LayerNorm(embed_dim)
-        self.attn = MultiHeadAttention(embed_dim, num_heads, dropout)
-        self.norm2 = nn.LayerNorm(embed_dim)
-        self.mlp = nn.Sequential(
-            nn.Linear(embed_dim, int(embed_dim * mlp_ratio)),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(int(embed_dim * mlp_ratio), embed_dim),
-            nn.Dropout(dropout)
-        )
-    
-    def forward(self, x):
-        x = x + self.attn(self.norm1(x))
-        x = x + self.mlp(self.norm2(x))
-        return x
 
 class ViTEncoder(BaseEncoder):
     """
-    Vision Transformer (ViT) encoder for image feature extraction.
+    Vision Transformer (ViT) encoder using pretrained ViT model from Hugging Face.
+    
+    This encoder loads a pretrained ViT model and provides a simple interface
+    for image encoding in the VQA system. It automatically handles image preprocessing
+    and provides the [CLS] token representation as output.
+    
+    Attributes:
+        model_name (str): Name of the pretrained ViT model
+        vit (ViTModel): The pretrained ViT model
+        vit_embed_dim (int): Embedding dimension of the ViT model
+        projection (nn.Module): Optional projection layer to match output dimension
     """
     
-    def __init__(self, img_size: int = 224, patch_size: int = 16, in_channels: int = 3, 
-                 embed_dim: int = 768, num_heads: int = 12, num_layers: int = 12, 
-                 mlp_ratio: float = 4.0, dropout: float = 0.1, output_dim: int = 768):
+    def __init__(self, 
+                 img_size: int = 224, 
+                 patch_size: int = 16, 
+                 in_channels: int = 3, 
+                 embed_dim: int = 768, 
+                 num_heads: int = 12, 
+                 num_layers: int = 12, 
+                 mlp_ratio: float = 4.0, 
+                 dropout: float = 0.1, 
+                 output_dim: int = 768, 
+                 model_name: str = "google/vit-base-patch16-224") -> None:
+        """
+        Initialize the ViT encoder.
+        
+        Args:
+            img_size: Input image size (not used for pretrained models)
+            patch_size: Patch size (not used for pretrained models)
+            in_channels: Number of input channels (not used for pretrained models)
+            embed_dim: Embedding dimension (not used for pretrained models)
+            num_heads: Number of attention heads (not used for pretrained models)
+            num_layers: Number of layers (not used for pretrained models)
+            mlp_ratio: MLP ratio (not used for pretrained models)
+            dropout: Dropout rate (not used for pretrained models)
+            output_dim: Desired output dimension
+            model_name: Name of the pretrained ViT model to load
+            
+        Raises:
+            ValueError: If model_name is invalid or model cannot be loaded
+        """
         super().__init__(name="ViT")
+        
+        if not isinstance(model_name, str) or not model_name:
+            raise ValueError(f"model_name must be a non-empty string, got {model_name}")
+        if not isinstance(output_dim, int) or output_dim <= 0:
+            raise ValueError(f"output_dim must be a positive integer, got {output_dim}")
+        
+        self.model_name: str = model_name
         self.output_dim = output_dim
         
-        # Patch embedding
-        self.patch_embed = PatchEmbedding(img_size, patch_size, in_channels, embed_dim)
+        # Load pretrained ViT model
+        try:
+            print(f"🔄 Loading pretrained ViT model: {model_name}")
+            self.vit = ViTModel.from_pretrained(model_name)
+        except Exception as e:
+            raise ValueError(f"Failed to load ViT model '{model_name}': {e}")
         
-        # Position embedding
-        self.pos_embed = nn.Parameter(torch.zeros(1, self.patch_embed.n_patches + 1, embed_dim))
+        # Get the actual embedding dimension from ViT
+        self.vit_embed_dim: int = self.vit.config.hidden_size
         
-        # Class token
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
-        
-        # Transformer blocks
-        self.blocks = nn.ModuleList([
-            TransformerBlock(embed_dim, num_heads, mlp_ratio, dropout)
-            for _ in range(num_layers)
-        ])
-        
-        # Layer norm
-        self.norm = nn.LayerNorm(embed_dim)
-        
-        # Projection to desired output dimension
-        if embed_dim != output_dim:
-            self.projection = nn.Linear(embed_dim, output_dim)
+        # Projection layer to match desired output dimension
+        if self.vit_embed_dim != output_dim:
+            self.projection = nn.Linear(self.vit_embed_dim, output_dim)
         else:
             self.projection = nn.Identity()
         
-        # Initialize weights
-        self._init_weights()
-    
-    def _init_weights(self):
-        """Initialize weights."""
-        nn.init.trunc_normal_(self.pos_embed, std=0.02)
-        nn.init.trunc_normal_(self.cls_token, std=0.02)
+        print(f"✅ ViT encoder initialized with {self.vit_embed_dim} -> {output_dim} projection")
     
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Forward pass through ViT encoder.
+        Forward pass through pretrained ViT encoder.
         
         Args:
             x: Input tensor of shape (batch_size, channels, height, width)
             
         Returns:
             Encoded features of shape (batch_size, output_dim)
+            
+        Raises:
+            ValueError: If input tensor has incorrect shape
         """
-        batch_size = x.shape[0]
+        if x.dim() != 4:
+            raise ValueError(f"Expected 4D input tensor (batch, channels, height, width), got shape {x.shape}")
         
-        # Patch embedding
-        x = self.patch_embed(x)  # (batch_size, n_patches, embed_dim)
+        if x.size(1) != 3:
+            raise ValueError(f"Expected 3 channels, got {x.size(1)} channels")
         
-        # Add class token
-        cls_tokens = self.cls_token.expand(batch_size, -1, -1)
-        x = torch.cat([cls_tokens, x], dim=1)  # (batch_size, n_patches+1, embed_dim)
+        # Pass through pretrained ViT
+        vit_outputs = self.vit(pixel_values=x)
         
-        # Add position embedding
-        x = x + self.pos_embed
-        
-        # Pass through transformer blocks
-        for block in self.blocks:
-            x = block(x)
-        
-        # Layer norm
-        x = self.norm(x)
-        
-        # Take class token representation
-        x = x[:, 0]  # (batch_size, embed_dim)
+        # Use the [CLS] token representation (first token)
+        pooled_output = vit_outputs.pooler_output
         
         # Project to desired output dimension
-        x = self.projection(x)
+        output = self.projection(pooled_output)
         
-        return x 
+        return output
+    
+    def get_processor(self) -> ViTImageProcessor:
+        """
+        Get the ViT image processor for preprocessing images.
+        
+        Returns:
+            ViT image processor instance
+            
+        Raises:
+            ValueError: If processor cannot be loaded
+        """
+        try:
+            return ViTImageProcessor.from_pretrained(self.model_name)
+        except Exception as e:
+            raise ValueError(f"Failed to load ViT processor for '{self.model_name}': {e}")
+    
+    def get_config(self) -> dict:
+        """
+        Get encoder configuration as a dictionary.
+        
+        Returns:
+            Dictionary containing encoder configuration
+        """
+        config = super().get_config()
+        config.update({
+            'model_name': self.model_name,
+            'vit_embed_dim': self.vit_embed_dim,
+            'has_projection': not isinstance(self.projection, nn.Identity)
+        })
+        return config 

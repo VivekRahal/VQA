@@ -1,307 +1,344 @@
-# Visual Question Answering (VQA) System
+# Modular Visual Question Answering (VQA) System
 
-A comprehensive Visual Question Answering system with both original and modular architectures, supporting multiple encoder and fusion strategies.
+A clean, modular, and extensible Visual Question Answering system built with PyTorch that supports multiple encoder and fusion strategies with pretrained models.
 
 ## 🚀 Features
 
-### Original System
-- CNN + LSTM architecture with concatenation fusion
-- FastAPI web interface for real-time predictions
-- Pre-trained model support
-- Simple and straightforward implementation
-
-### Modular System (New)
-- **Modular Architecture**: Base classes for encoders and fusion strategies
-- **Multiple Encoders**: CNN, LSTM, ViT, and BERT encoders
+- **Modular Architecture**: Easy to experiment with different encoder and fusion combinations
+- **Pretrained Models**: Support for BERT, ViT, ResNet, and EfficientNet from Hugging Face
 - **Multiple Fusion Strategies**: Concatenation, Co-attention, and Bilinear fusion
-- **Configuration System**: Preset combinations for easy experimentation
-- **Comprehensive Training**: Metrics tracking, early stopping, and plotting
-- **Data Management**: Automated train/val/test splitting
+- **Clean Code**: Well-documented, type-hinted, and follows OOP principles
+- **GPU Optimization**: Automatic GPU detection and memory management
+- **Easy Configuration**: Preset configurations for common combinations
 
 ## 📁 Project Structure
 
 ```
 VQA/
-├── app.py                     # Original FastAPI application
-├── main.py                    # Original training script
-├── model.py                   # Original VQA model
-├── config.py                  # Original configuration
-├── dataset.py                 # Dataset handling
-├── utils/helper.py            # Utility functions
-├── data/                      # Data directory
-│   ├── images/                # Image files
-│   ├── data_train.csv         # Training data
-│   ├── train_split.csv        # Modular system train split
-│   ├── val_split.csv          # Modular system validation split
-│   ├── test_split.csv         # Modular system test split
-│   └── *_images_split.txt     # Image lists for splits
-├── encoders/                  # Modular encoder implementations
-│   ├── base_encoder.py        # Base encoder class
-│   ├── cnn_encoder.py         # CNN encoder
-│   ├── lstm_encoder.py        # LSTM encoder
-│   ├── vit_encoder.py         # Vision Transformer encoder
-│   └── bert_encoder.py        # BERT encoder
-├── fusion/                    # Modular fusion implementations
-│   ├── base_fusion.py         # Base fusion class
-│   ├── concatenation_fusion.py # Concatenation fusion
-│   ├── coattention_fusion.py  # Co-attention fusion
-│   └── bilinear_fusion.py     # Bilinear fusion
-├── modular_model.py           # Modular VQA model
-├── modular_trainer.py         # Modular training system
-├── modular_config.py          # Modular configuration
-├── main_modular.py            # Modular training script
-├── prepare_data.py            # Data splitting utility
-├── demo_modular_vqa.py        # Demo script
-├── README_MODULAR.md          # Detailed modular system docs
-└── requirements.txt           # Dependencies
+├── encoders/                 # Image and text encoders
+│   ├── base_encoder.py      # Abstract base class
+│   ├── cnn_encoder.py       # CNN encoder (ResNet, EfficientNet)
+│   ├── vit_encoder.py       # Vision Transformer encoder
+│   ├── bert_encoder.py      # BERT text encoder
+│   └── lstm_encoder.py      # LSTM text encoder
+├── fusion/                  # Fusion strategies
+│   ├── base_fusion.py       # Abstract base class
+│   ├── concatenation_fusion.py
+│   ├── coattention_fusion.py
+│   └── bilinear_fusion.py
+├── utils/                   # Utility modules
+│   ├── helper.py           # Helper functions
+│   ├── gpu_utils.py        # GPU utilities
+│   └── dataloader_utils.py # DataLoader optimization
+├── data/                   # Dataset files
+├── modular_config.py       # Configuration management
+├── modular_model.py        # Main VQA model
+├── modular_trainer.py      # Training logic
+├── main_modular.py         # Main training script
+├── prepare_data.py         # Data preparation
+├── demo_pretrained_vqa.py  # Demo script
+└── requirements.txt        # Dependencies
 ```
 
 ## 🛠️ Installation
 
-### Prerequisites
-- Python 3.8+
-- PyTorch 1.9+
-- CUDA (optional, for GPU acceleration)
-
-### Setup
-
-1. **Clone the repository**
+1. **Clone the repository**:
    ```bash
-   git clone https://github.com/VivekRahal/VQA.git
+   git clone <repository-url>
    cd VQA
    ```
 
-2. **Create virtual environment**
+2. **Create virtual environment**:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. **Install dependencies**
+3. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Install additional dependencies for FastAPI**
+4. **Install CUDA PyTorch** (for GPU support):
    ```bash
-   pip install python-multipart
+   # For CUDA 11.8 (adjust version as needed)
+   pip uninstall torch torchvision torchaudio
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
    ```
 
-## 📊 Data Preparation
+## 📊 Available Presets
 
-### For Original System
-The original system uses the existing data structure:
-- `data/data_train.csv` - Training data
-- `data/images/` - Image files
-- `data/answer_space.txt` - Answer vocabulary
+The system comes with several preset configurations:
 
-### For Modular System
-Run the data preparation script to create train/val/test splits:
+| Preset | Image Encoder | Text Encoder | Fusion | Description |
+|--------|---------------|--------------|---------|-------------|
+| `original` | Custom CNN | LSTM | Concatenation | Original implementation |
+| `pretrained_cnn_lstm` | ResNet50 | LSTM | Concatenation | Pretrained CNN + LSTM |
+| `pretrained_vit_bert` | ViT | BERT | Concatenation | Modern transformer-based |
+| `pretrained_vit_bert_coattention` | ViT | BERT | Co-attention | Advanced attention fusion |
+| `pretrained_vit_bert_bilinear` | ViT | BERT | Bilinear | Bilinear fusion |
+| `pretrained_cnn_bert` | ResNet50 | BERT | Concatenation | CNN + BERT combination |
+| `pretrained_cnn_bert_coattention` | ResNet50 | BERT | Co-attention | CNN + BERT + Co-attention |
+| `pretrained_cnn_bert_bilinear` | ResNet50 | BERT | Bilinear | CNN + BERT + Bilinear |
+| `efficient_vit_bert` | EfficientNet | BERT | Concatenation | Efficient architecture |
+
+## 🚀 Quick Start
+
+### 1. Prepare Data
+
+First, prepare your dataset:
 
 ```bash
 python prepare_data.py
 ```
 
-This creates:
-- `data/train_split.csv`, `data/val_split.csv`, `data/test_split.csv`
-- `data/train_images_split.txt`, `data/val_images_split.txt`, `data/test_images_split.txt`
+This will:
+- Split your data into train/validation/test sets
+- Create corresponding image list files
+- Set up the data structure for training
 
-## 🚀 Usage
+### 2. Train a Model
 
-### Original System
+Train with a preset configuration:
 
-#### Training
 ```bash
-python main.py
+# Train with ViT + BERT + Co-attention (default)
+python main_modular.py
+
+# Train with a specific preset
+python main_modular.py pretrained_cnn_bert_bilinear
+
+# Train with custom preset
+python main_modular.py pretrained_vit_bert
 ```
 
-#### Web Interface
+### 3. Demo
+
+Run the demo to see the system in action:
+
 ```bash
-python app.py
-```
-Then visit `http://localhost:8000/docs` for the interactive API documentation.
-
-#### API Usage
-```python
-import requests
-
-# Upload image and question
-files = {'image': open('image.jpg', 'rb')}
-data = {'question': 'What color is the car?'}
-response = requests.post('http://localhost:8000/predict', files=files, data=data)
-print(response.json())
+python demo_pretrained_vqa.py
 ```
 
-### Modular System
+## 🔧 Configuration
 
-#### Quick Start
-1. **Prepare data** (if not done already):
-   ```bash
-   python prepare_data.py
-   ```
+### Using Presets
 
-2. **Train with default preset** (ViT + BERT + Co-attention):
-   ```bash
-   python main_modular.py
-   ```
-
-3. **Try different combinations** by editing `main_modular.py`:
-   ```python
-   # Change this line to use different presets
-   config = ModularConfig.from_preset("cnn_bert_bilinear")
-   ```
-
-#### Available Presets
-- `"vit_bert_coattention"` - Vision Transformer + BERT + Co-attention
-- `"cnn_bert_bilinear"` - CNN + BERT + Bilinear fusion
-- `"cnn_lstm_concatenation"` - CNN + LSTM + Concatenation
-- `"vit_lstm_coattention"` - Vision Transformer + LSTM + Co-attention
-
-#### Custom Configuration
 ```python
 from modular_config import ModularConfig
 
-# Create custom configuration
-config = ModularConfig(
-    image_encoder="cnn",
-    text_encoder="bert", 
-    fusion_strategy="bilinear",
-    hidden_size=512,
-    num_answers=582,
-    learning_rate=0.001,
-    batch_size=32,
-    num_epochs=10
-)
+# Use a preset
+config = ModularConfig()
+config.get_preset_config("pretrained_vit_bert_coattention")
+
+# Customize parameters
+config.batch_size = 4
+config.learning_rate = 0.0001
+config.num_epochs = 10
 ```
 
-## 🏗️ System Architecture
+### Custom Configuration
 
-### Original System
-```
-Image → CNN → Image Features
-Text → LSTM → Text Features
-Features → Concatenation → Classifier → Answer
-```
-
-### Modular System
-```
-Image → [CNN/LSTM/ViT] → Image Features
-Text → [LSTM/BERT] → Text Features
-Features → [Concatenation/Co-attention/Bilinear] → Classifier → Answer
-```
-
-## 📈 Training and Evaluation
-
-### Original System
-- Single training script with fixed architecture
-- Basic metrics logging
-- Model checkpointing
-
-### Modular System
-- Comprehensive training with:
-  - Training/validation loss tracking
-  - Accuracy metrics
-  - Early stopping
-  - Learning rate scheduling
-  - Model checkpointing
-  - Training plots
-
-#### Training Output Example
-```
-Epoch 1/10
-Train Loss: 4.1234 | Train Acc: 0.2345
-Val Loss: 3.9876 | Val Acc: 0.2567
-```
-
-## 🔧 Extending the Modular System
-
-### Adding New Encoders
-1. Create new encoder in `encoders/` directory
-2. Inherit from `BaseEncoder`
-3. Implement required methods
-4. Add to `ModularConfig.ENCODER_REGISTRY`
-
-### Adding New Fusion Strategies
-1. Create new fusion in `fusion/` directory
-2. Inherit from `BaseFusion`
-3. Implement required methods
-4. Add to `ModularConfig.FUSION_REGISTRY`
-
-### Example: Adding a New Encoder
 ```python
-# encoders/custom_encoder.py
-from .base_encoder import BaseEncoder
+from modular_config import ModularConfig
 
-class CustomEncoder(BaseEncoder):
-    def __init__(self, input_size, hidden_size):
-        super().__init__(input_size, hidden_size)
-        # Your implementation here
-    
-    def forward(self, x):
-        # Your forward pass here
-        return encoded_features
+config = ModularConfig()
+
+# Set encoders
+config.image_encoder_type = "vit"
+config.text_encoder_type = "bert"
+config.fusion_type = "coattention"
+
+# Set dimensions
+config.image_encoder_dim = 768
+config.text_encoder_dim = 768
+config.fusion_dim = 1536
+
+# Set pretrained models
+config.vit_model_name = "google/vit-base-patch16-224"
+config.bert_model_name = "bert-base-uncased"
 ```
 
-## 📊 Performance Comparison
+## 🏗️ Architecture
 
-| System | Encoder | Fusion | Accuracy | Training Time |
-|--------|---------|--------|----------|---------------|
-| Original | CNN+LSTM | Concatenation | ~45% | ~2 hours |
-| Modular | ViT+BERT | Co-attention | ~52% | ~4 hours |
-| Modular | CNN+BERT | Bilinear | ~48% | ~3 hours |
+### Base Classes
 
-*Note: Performance may vary based on hardware and dataset*
+The system uses abstract base classes for extensibility:
+
+- **BaseEncoder**: Abstract base for all encoders
+- **BaseFusion**: Abstract base for all fusion strategies
+
+### Adding New Components
+
+#### New Encoder
+
+```python
+from encoders.base_encoder import BaseEncoder
+
+class MyEncoder(BaseEncoder):
+    def __init__(self, name: str, **kwargs):
+        super().__init__(name)
+        # Your implementation
+        
+    def forward(self, x):
+        # Your forward pass
+        return output
+```
+
+#### New Fusion Strategy
+
+```python
+from fusion.base_fusion import BaseFusion
+
+class MyFusion(BaseFusion):
+    def __init__(self, name: str, image_dim: int, text_dim: int):
+        super().__init__(name, image_dim, text_dim)
+        # Your implementation
+        
+    def forward(self, image_features, text_features):
+        # Your fusion logic
+        return fused_features
+```
+
+## 📈 Training
+
+### Training Process
+
+1. **Data Loading**: Efficient DataLoader with optimal settings
+2. **Model Creation**: Automatic component initialization
+3. **Training Loop**: With validation and early stopping
+4. **Monitoring**: Loss and accuracy tracking
+5. **Saving**: Best model checkpoint
+
+### Training Output
+
+```
+🚀 Starting Modular VQA Training
+==================================================
+Applied preset configuration: pretrained_vit_bert_coattention
+
+=== Modular VQA Configuration ===
+Image Encoder: ViT (768D)
+Text Encoder: BERT (768D)
+Fusion Strategy: CoAttention (1536D)
+Use Pretrained Models: True
+ViT Model: google/vit-base-patch16-224 (pretrained: True)
+BERT Model: bert-base-uncased (pretrained: True)
+Batch Size: 2
+Learning Rate: 0.001
+Device: cuda
+DataLoader Workers: 0
+Pin Memory: True
+Persistent Workers: False
+===================================
+
+✅ Data loaders created:
+   Train: 4756 samples, 2378 batches
+   Val: 1359 samples, 680 batches
+
+=== Modular VQA Model Configuration ===
+Image Encoder: ViT (768D)
+Text Encoder: BERT (768D)
+Fusion Strategy: CoAttention (1536D)
+Number of Classes: 3
+Use Pretrained Models: True
+Total Parameters: 110,595,843
+========================================
+
+🎯 Training with preset: pretrained_vit_bert_coattention
+Epoch 1/5: 100%|██████████| 2378/2378 [05:23<00:00, 7.37it/s]
+Train Loss: 0.9876, Train Acc: 0.4567
+Val Loss: 0.9234, Val Acc: 0.4789
+```
+
+## 🔍 Monitoring
+
+### Training Metrics
+
+- **Loss**: Training and validation loss
+- **Accuracy**: Training and validation accuracy
+- **Learning Curves**: Automatic plotting
+- **Early Stopping**: Prevents overfitting
+
+### GPU Monitoring
+
+```python
+from utils.gpu_utils import GPUMonitor
+
+monitor = GPUMonitor()
+monitor.print_gpu_info()
+monitor.monitor_gpu_usage()
+```
 
 ## 🐛 Troubleshooting
 
 ### Common Issues
 
-1. **FastAPI multipart error**:
-   ```bash
-   pip install python-multipart
-   ```
+1. **CUDA Out of Memory**:
+   - Reduce batch size
+   - Use smaller models
+   - Enable gradient accumulation
 
-2. **Port already in use**:
-   ```bash
-   # Kill process using port 8000
-   netstat -ano | findstr :8000
-   taskkill /PID <PID> /F
-   ```
+2. **Slow Training**:
+   - Increase num_workers
+   - Enable pin_memory
+   - Use persistent_workers
 
-3. **CUDA out of memory**:
-   - Reduce batch size in configuration
-   - Use smaller model variants
+3. **Import Errors**:
+   - Check virtual environment
+   - Install missing dependencies
+   - Verify Python path
 
-4. **Missing dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Performance Optimization
+
+```python
+# Optimize DataLoader
+config.num_workers = 4  # Adjust based on CPU cores
+config.pin_memory = True
+config.persistent_workers = True
+
+# Use mixed precision training
+from torch.cuda.amp import autocast, GradScaler
+```
+
+## 📝 Code Quality
+
+### OOP Principles
+
+- **Encapsulation**: Private methods and attributes
+- **Inheritance**: Base classes for common functionality
+- **Polymorphism**: Interface-based design
+- **Abstraction**: Abstract base classes
+
+### Clean Code Practices
+
+- **Type Hints**: Full type annotation
+- **Documentation**: Comprehensive docstrings
+- **Error Handling**: Proper exception handling
+- **Validation**: Input parameter validation
+- **Separation of Concerns**: Modular design
+
+### Code Style
+
+- **PEP 8**: Python style guide compliance
+- **Naming**: Clear and descriptive names
+- **Comments**: Meaningful documentation
+- **Structure**: Logical organization
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+1. Follow the existing code style
+2. Add type hints and documentation
+3. Include error handling
+4. Write tests for new features
+5. Update documentation
 
-## 📝 License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- Original VQA dataset and research
-- PyTorch and FastAPI communities
-- Vision Transformer and BERT implementations
-
-## 📞 Support
-
-For questions and support:
-- Create an issue on GitHub
-- Check the documentation in `README_MODULAR.md`
-- Review the demo scripts for usage examples
-
----
-
-**Note**: The original system remains fully functional alongside the new modular system. Choose the system that best fits your needs! 
+- Hugging Face for pretrained models
+- PyTorch team for the framework
+- VQA community for research insights 

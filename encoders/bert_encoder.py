@@ -1,172 +1,145 @@
-# encoders/bert_encoder.py
+"""
+BERT encoder module for VQA system.
+
+This module provides a BERT encoder that uses pretrained BERT models from Hugging Face.
+It wraps the transformers.BertModel for easy integration into the VQA system.
+"""
+
+from typing import Optional
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from transformers import BertModel, BertTokenizer
 from .base_encoder import BaseEncoder
 
-class BERTEmbedding(nn.Module):
-    """BERT-style embedding layer with token, position, and segment embeddings."""
-    
-    def __init__(self, vocab_size: int, embed_dim: int = 768, max_seq_len: int = 512, dropout: float = 0.1):
-        super().__init__()
-        self.token_embedding = nn.Embedding(vocab_size, embed_dim)
-        self.position_embedding = nn.Embedding(max_seq_len, embed_dim)
-        self.segment_embedding = nn.Embedding(2, embed_dim)  # 0 for question, 1 for answer (if needed)
-        self.layer_norm = nn.LayerNorm(embed_dim)
-        self.dropout = nn.Dropout(dropout)
-    
-    def forward(self, x, segment_ids=None):
-        """
-        Args:
-            x: Input token indices of shape (batch_size, seq_len)
-            segment_ids: Segment IDs of shape (batch_size, seq_len), defaults to zeros
-        """
-        seq_len = x.size(1)
-        position_ids = torch.arange(seq_len, device=x.device).unsqueeze(0).expand_as(x)
-        
-        if segment_ids is None:
-            segment_ids = torch.zeros_like(x)
-        
-        token_embeds = self.token_embedding(x)
-        position_embeds = self.position_embedding(position_ids)
-        segment_embeds = self.segment_embedding(segment_ids)
-        
-        embeddings = token_embeds + position_embeds + segment_embeds
-        embeddings = self.layer_norm(embeddings)
-        embeddings = self.dropout(embeddings)
-        
-        return embeddings
-
-class BERTAttention(nn.Module):
-    """BERT-style multi-head self-attention mechanism."""
-    
-    def __init__(self, embed_dim: int, num_heads: int, dropout: float = 0.1):
-        super().__init__()
-        self.embed_dim = embed_dim
-        self.num_heads = num_heads
-        self.head_dim = embed_dim // num_heads
-        assert self.head_dim * num_heads == embed_dim, "embed_dim must be divisible by num_heads"
-        
-        self.query = nn.Linear(embed_dim, embed_dim)
-        self.key = nn.Linear(embed_dim, embed_dim)
-        self.value = nn.Linear(embed_dim, embed_dim)
-        self.dropout = nn.Dropout(dropout)
-        self.out_proj = nn.Linear(embed_dim, embed_dim)
-    
-    def forward(self, x, attention_mask=None):
-        batch_size, seq_len, embed_dim = x.shape
-        
-        # Linear projections
-        q = self.query(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        k = self.key(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        v = self.value(x).view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-        
-        # Attention scores
-        scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim ** 0.5)
-        
-        # Apply attention mask if provided
-        if attention_mask is not None:
-            attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)
-            scores = scores.masked_fill(attention_mask == 0, -1e9)
-        
-        # Softmax and dropout
-        attention_weights = F.softmax(scores, dim=-1)
-        attention_weights = self.dropout(attention_weights)
-        
-        # Apply attention to values
-        context = torch.matmul(attention_weights, v)
-        context = context.transpose(1, 2).contiguous().view(batch_size, seq_len, embed_dim)
-        
-        # Output projection
-        output = self.out_proj(context)
-        
-        return output
-
-class BERTLayer(nn.Module):
-    """BERT transformer layer with self-attention and feed-forward network."""
-    
-    def __init__(self, embed_dim: int, num_heads: int, ff_dim: int, dropout: float = 0.1):
-        super().__init__()
-        self.attention = BERTAttention(embed_dim, num_heads, dropout)
-        self.attention_norm = nn.LayerNorm(embed_dim)
-        self.ff = nn.Sequential(
-            nn.Linear(embed_dim, ff_dim),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(ff_dim, embed_dim),
-            nn.Dropout(dropout)
-        )
-        self.ff_norm = nn.LayerNorm(embed_dim)
-    
-    def forward(self, x, attention_mask=None):
-        # Self-attention with residual connection
-        attn_output = self.attention(x, attention_mask)
-        x = self.attention_norm(x + attn_output)
-        
-        # Feed-forward with residual connection
-        ff_output = self.ff(x)
-        x = self.ff_norm(x + ff_output)
-        
-        return x
 
 class BERTEncoder(BaseEncoder):
     """
-    BERT encoder for text feature extraction.
-    Simplified BERT-like architecture for VQA tasks.
+    BERT encoder using pretrained BERT model from Hugging Face.
+    
+    This encoder loads a pretrained BERT model and provides a simple interface
+    for text encoding in the VQA system. It automatically handles tokenization
+    and provides the [CLS] token representation as output.
+    
+    Attributes:
+        model_name (str): Name of the pretrained BERT model
+        bert (BertModel): The pretrained BERT model
+        bert_embed_dim (int): Embedding dimension of the BERT model
+        projection (nn.Module): Optional projection layer to match output dimension
     """
     
-    def __init__(self, vocab_size: int, embed_dim: int = 768, num_heads: int = 12, 
-                 num_layers: int = 6, ff_dim: int = 3072, max_seq_len: int = 512, 
-                 dropout: float = 0.1, output_dim: int = 768):
+    def __init__(self, 
+                 vocab_size: Optional[int] = None, 
+                 embed_dim: int = 768, 
+                 num_heads: int = 12, 
+                 num_layers: int = 6, 
+                 ff_dim: int = 3072, 
+                 max_seq_len: int = 512, 
+                 dropout: float = 0.1, 
+                 output_dim: int = 768, 
+                 model_name: str = "bert-base-uncased") -> None:
+        """
+        Initialize the BERT encoder.
+        
+        Args:
+            vocab_size: Vocabulary size (not used for pretrained models)
+            embed_dim: Embedding dimension (not used for pretrained models)
+            num_heads: Number of attention heads (not used for pretrained models)
+            num_layers: Number of layers (not used for pretrained models)
+            ff_dim: Feed-forward dimension (not used for pretrained models)
+            max_seq_len: Maximum sequence length (not used for pretrained models)
+            dropout: Dropout rate (not used for pretrained models)
+            output_dim: Desired output dimension
+            model_name: Name of the pretrained BERT model to load
+            
+        Raises:
+            ValueError: If model_name is invalid or model cannot be loaded
+        """
         super().__init__(name="BERT")
+        
+        if not isinstance(model_name, str) or not model_name:
+            raise ValueError(f"model_name must be a non-empty string, got {model_name}")
+        if not isinstance(output_dim, int) or output_dim <= 0:
+            raise ValueError(f"output_dim must be a positive integer, got {output_dim}")
+        
+        self.model_name: str = model_name
         self.output_dim = output_dim
         
-        # Embedding layer
-        self.embedding = BERTEmbedding(vocab_size, embed_dim, max_seq_len, dropout)
+        # Load pretrained BERT model
+        try:
+            print(f"🔄 Loading pretrained BERT model: {model_name}")
+            self.bert = BertModel.from_pretrained(model_name)
+        except Exception as e:
+            raise ValueError(f"Failed to load BERT model '{model_name}': {e}")
         
-        # BERT layers
-        self.layers = nn.ModuleList([
-            BERTLayer(embed_dim, num_heads, ff_dim, dropout)
-            for _ in range(num_layers)
-        ])
+        # Get the actual embedding dimension from BERT
+        self.bert_embed_dim: int = self.bert.config.hidden_size
         
-        # Final layer norm
-        self.final_norm = nn.LayerNorm(embed_dim)
-        
-        # Pooler (for sentence-level representation)
-        self.pooler = nn.Linear(embed_dim, embed_dim)
-        
-        # Projection to desired output dimension
-        if embed_dim != output_dim:
-            self.projection = nn.Linear(embed_dim, output_dim)
+        # Projection layer to match desired output dimension
+        if self.bert_embed_dim != output_dim:
+            self.projection = nn.Linear(self.bert_embed_dim, output_dim)
         else:
             self.projection = nn.Identity()
+        
+        print(f"✅ BERT encoder initialized with {self.bert_embed_dim} -> {output_dim} projection")
     
-    def forward(self, x: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
         """
-        Forward pass through BERT encoder.
+        Forward pass through pretrained BERT encoder.
         
         Args:
             x: Input tensor of shape (batch_size, seq_len) containing token indices
-            attention_mask: Attention mask of shape (batch_size, seq_len), 1 for tokens to attend to, 0 for padding
+            attention_mask: Attention mask of shape (batch_size, seq_len), 
+                           where 1 indicates tokens to attend to and 0 indicates padding
             
         Returns:
             Encoded features of shape (batch_size, output_dim)
+            
+        Raises:
+            ValueError: If input tensor has incorrect shape
         """
-        # Embeddings
-        x = self.embedding(x)
+        if x.dim() != 2:
+            raise ValueError(f"Expected 2D input tensor, got shape {x.shape}")
         
-        # Pass through BERT layers
-        for layer in self.layers:
-            x = layer(x, attention_mask)
+        if attention_mask is not None and attention_mask.shape != x.shape:
+            raise ValueError(f"Attention mask shape {attention_mask.shape} must match input shape {x.shape}")
         
-        # Final layer norm
-        x = self.final_norm(x)
+        # Pass through pretrained BERT
+        bert_outputs = self.bert(input_ids=x, attention_mask=attention_mask)
         
-        # Pooling: take the first token ([CLS]) representation
-        pooled_output = torch.tanh(self.pooler(x[:, 0]))
+        # Use the [CLS] token representation (first token)
+        pooled_output = bert_outputs.pooler_output
         
         # Project to desired output dimension
         output = self.projection(pooled_output)
         
-        return output 
+        return output
+    
+    def get_tokenizer(self) -> BertTokenizer:
+        """
+        Get the BERT tokenizer for preprocessing text.
+        
+        Returns:
+            BERT tokenizer instance
+            
+        Raises:
+            ValueError: If tokenizer cannot be loaded
+        """
+        try:
+            return BertTokenizer.from_pretrained(self.model_name)
+        except Exception as e:
+            raise ValueError(f"Failed to load BERT tokenizer for '{self.model_name}': {e}")
+    
+    def get_config(self) -> dict:
+        """
+        Get encoder configuration as a dictionary.
+        
+        Returns:
+            Dictionary containing encoder configuration
+        """
+        config = super().get_config()
+        config.update({
+            'model_name': self.model_name,
+            'bert_embed_dim': self.bert_embed_dim,
+            'has_projection': not isinstance(self.projection, nn.Identity)
+        })
+        return config 
