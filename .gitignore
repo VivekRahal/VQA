@@ -1,3 +1,69 @@
-/vivek/
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Model files
+*.pth
+*.pt
+*.pkl
+
+# Data files (keep only the split files)
+data/*.csv
+data/*.txt
+!data/train_split.csv
+!data/val_split.csv
+!data/test_split.csv
+!data/train_images_split.txt
+!data/val_images_split.txt
+!data/test_images_split.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# vivek/
+/vivek/
 *.pyc   
