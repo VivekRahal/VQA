@@ -19,7 +19,10 @@ class Trainer:
             self.train_dataset, 
             batch_size=self.config.batch_size, 
             shuffle=True, 
-            collate_fn=vqa_collate_fn
+            collate_fn=vqa_collate_fn,
+            num_workers=self.config.num_workers,
+            pin_memory=self.config.pin_memory,
+            persistent_workers=self.config.persistent_workers
         )
         
         # Create the validation dataset using the validation CSV and the test image list.
@@ -30,7 +33,10 @@ class Trainer:
                 self.val_dataset,
                 batch_size=self.config.batch_size,
                 shuffle=False,
-                collate_fn=vqa_collate_fn
+                collate_fn=vqa_collate_fn,
+                num_workers=self.config.num_workers,
+                pin_memory=self.config.pin_memory,
+                persistent_workers=self.config.persistent_workers
             )
         
         # Set vocabulary size and update number of answer classes (if applicable)

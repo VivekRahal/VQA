@@ -1,5 +1,6 @@
 # modular_config.py
 import torch
+import os
 
 class ModularConfig:
     """
@@ -14,6 +15,11 @@ class ModularConfig:
         self.learning_rate = 0.001
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.num_classes = 3
+        
+        # DataLoader parameters
+        self.num_workers = 0  # 0 for Windows, 2-4 for Linux/Mac, adjust based on CPU cores
+        self.pin_memory = True if torch.cuda.is_available() else False
+        self.persistent_workers = False  # Set to True if num_workers > 0 for better performance
         
         # Encoder types
         self.image_encoder_type = "cnn"  # Options: "cnn", "vit"
@@ -148,4 +154,7 @@ class ModularConfig:
         print(f"Batch Size: {self.batch_size}")
         print(f"Learning Rate: {self.learning_rate}")
         print(f"Device: {self.device}")
+        print(f"DataLoader Workers: {self.num_workers}")
+        print(f"Pin Memory: {self.pin_memory}")
+        print(f"Persistent Workers: {self.persistent_workers}")
         print("=" * 35) 
