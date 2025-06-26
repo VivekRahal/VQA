@@ -1,6 +1,7 @@
 """
 Modern FastAPI VQA Chat Application
 Provides a real-time chat interface for Visual Question Answering
+Compatible with Hugging Face Spaces deployment
 """
 
 import os
@@ -73,6 +74,11 @@ class VQAChatApp:
         async def get_chat_ui():
             """Serve the main chat UI"""
             return self._get_chat_html()
+        
+        @self.app.get("/health")
+        async def health_check():
+            """Health check endpoint for Hugging Face Spaces"""
+            return {"status": "healthy", "device": str(self.device)}
         
         @self.app.post("/api/load-model")
         async def load_model_endpoint():
@@ -170,17 +176,25 @@ class VQAChatApp:
         self.config = ModularConfig()
         
         # Load vocabulary
-        self.vocab = load_vocab("vocab.pkl")
+        vocab_path = os.getenv("VOCAB_PATH", "vocab.pkl")
+        if os.path.exists(vocab_path):
+            self.vocab = load_vocab(vocab_path)
+        else:
+            # Create default vocab if not found
+            self.vocab = {"<PAD>": 0, "<UNK>": 1, "<START>": 2, "<END>": 3}
+            for i, word in enumerate(["what", "is", "the", "color", "of", "this", "image", "how", "many", "people", "are", "in", "the", "picture"]):
+                self.vocab[word] = i + 4
         
         # Load answer mapping
-        answer_space_file = "data/answer_space.txt"
+        answer_space_file = os.getenv("ANSWER_SPACE_PATH", "data/answer_space.txt")
         if os.path.exists(answer_space_file):
             with open(answer_space_file, 'r', encoding='utf-8') as f:
                 answers = [line.strip() for line in f.readlines()]
             self.answer_mapping = {i: answer for i, answer in enumerate(answers)}
         else:
             # Create default answer mapping if file doesn't exist
-            self.answer_mapping = {i: f"answer_{i}" for i in range(1000)}
+            default_answers = ["yes", "no", "red", "blue", "green", "yellow", "black", "white", "one", "two", "three", "four", "five", "car", "person", "dog", "cat", "house", "tree", "book", "chair", "table", "unknown"]
+            self.answer_mapping = {i: answer for i, answer in enumerate(default_answers)}
         
         # Set vocab size and num classes in config
         self.config.set_vocab_size(len(self.vocab))
@@ -190,12 +204,16 @@ class VQAChatApp:
         self.model = ModularVQAModel(config=self.config)
         
         # Load trained weights
-        model_path = "best_modular_model.pth"
+        model_path = os.getenv("MODEL_PATH", "best_modular_model.pth")
         if os.path.exists(model_path):
             checkpoint = torch.load(model_path, map_location=self.device)
             self.model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"✅ Loaded model from {model_path}")
         else:
-            raise FileNotFoundError(f"Model file {model_path} not found")
+            # Create demo model if no trained model exists
+            print("⚠️ No trained model found, creating demo model...")
+            self._create_demo_model()
+        
         self.model.to(self.device)
         self.model.eval()
         
@@ -208,6 +226,24 @@ class VQAChatApp:
             self.tokenizer = None
         
         print(f"Model loaded successfully on {self.device}")
+    
+    def _create_demo_model(self):
+        """Create a demo model with random weights for testing"""
+        import torch.nn as nn
+        
+        # Initialize with random weights
+        def init_weights(m):
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+        
+        self.model.apply(init_weights)
+        print("✅ Demo model created with random weights")
     
     async def _predict_answer(self, image: Image.Image, question: str) -> str:
         """Predict answer for given image and question"""
@@ -493,7 +529,8 @@ class VQAChatApp:
         
         // Initialize WebSocket connection
         function initWebSocket() {
-            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
             
             ws.onopen = function() {
                 console.log('WebSocket connected');
@@ -616,13 +653,17 @@ class VQAChatApp:
         uvicorn.run(self.app, host=host, port=port)
 
 
+# Create FastAPI app instance for Hugging Face Spaces
+app = VQAChatApp().app
+
+
 def main():
     """Main function to run the VQA Chat Application"""
-    app = VQAChatApp()
+    chat_app = VQAChatApp()
     print("🚀 Starting VQA Chat Application...")
     print("📱 Open your browser and go to: http://localhost:8000")
     print("💡 First click 'Load Model' then upload an image and ask questions!")
-    app.run()
+    chat_app.run()
 
 
 if __name__ == "__main__":

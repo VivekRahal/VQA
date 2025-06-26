@@ -1,0 +1,16 @@
+# Core PyTorch dependencies
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Deep learning and ML
+transformers>=4.30.0
+numpy>=1.24.0
+Pillow>=10.0.0
+
+# Hugging Face ecosystem
+huggingface-hub>=0.16.0
+gradio>=4.0.0
+
+# Utilities
+tqdm>=4.65.0
+requests>=2.31.0 
